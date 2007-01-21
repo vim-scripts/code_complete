@@ -2,21 +2,34 @@
 " File:         code_complete.vim
 " Brief:        function parameter complete, code snippets, and much more.
 " Author:       Mingbai <mbbill AT gmail DOT com>
-" Last Change:  2007-01-12 02:14:45
-" Version:      2.2
+" Last Change:  2007-01-18 11:57:55
+" Version:      2.3
 "
 " Install:      1. Put code_complete.vim to plugin 
 "                  directory.
 "               2. Use the command below to create tags 
 "                  file including signature field.
-"                  ctags -R --fields=+S .
+"                  ctags -R --c-kinds=+p --fields=+S .
 "
 " Usage:        
-"               
+"           hotkey:
+"               "("     complete funtion parameters.
+"               "<tab>" complete key words.
+"
+"           variables:
+"               g:completekey
+"                   the key used to complete function 
+"                   parameters and key words.
+"               s:rs, s:re
+"                   region start and stop
+"               you can change them as you like.
+"
+"           key words:
+"               see "templates" below.
 "==================================================
 
 " Variable Definations: {{{1
-" options:
+" options, change them as you like:
 let g:completekey="<tab>"   "hotkey
 let s:rs='`<'    "region start
 let s:re='>`'    "region stop
@@ -58,7 +71,7 @@ function! FunctionComplete()
         if has_key(i,'kind') && has_key(i,'name') && has_key(i,'signature')
             if (i.kind=='p' || i.kind=='f') && i.name==fun  " p is declare, f is defination
                 let tmp=substitute(i.signature,',',s:re.','.s:rs,'g')
-                let tmp=substitute(tmp,'(\(.*\))','('.s:rs.'\1'.s:re.');','g')
+                let tmp=substitute(tmp,'(\(.*\))','('.s:rs.'\1'.s:re.')','g')
                 if index(signature_word,tmp)==-1
                     let signature_word+=[tmp]
                     let item={}
@@ -96,10 +109,10 @@ function! SwitchRegion(key)
         if s:expanded==1
             let s:expanded=0
             return ''
-        else
-            "return g:completekey
-            "exec "return ".g:completekey
+        elseif g:completekey=="<tab>"
             exec 'return "'.escape(a:key,'<').'"'
+        else
+            return ''
         endif
     endif
 endfunction
@@ -129,15 +142,24 @@ function! GetFileName()
 endfunction
 
 " Templates: {{{1
+" to add templates for new file type, see below
+"
+" "some new file type
+" let g:template['newft'] = {}
+" let g:template['newft']['keyword'] = "some abbrevation"
+" let g:template['newft']['anotherkeyword'] = "another abbrevation"
+" ...
+"
+" ---------------------------------------------
 " C templates
 let g:template = {}
 let g:template['c'] = {}
-let g:template['c']['c'] = "/*  */\<left>\<left>\<left>"
+let g:template['c']['co'] = "/*  */\<left>\<left>\<left>"
 let g:template['c']['cc'] = "/**<  */\<left>\<left>\<left>"
-let g:template['c']['d'] = "#define  "
-let g:template['c']['i'] = "#include  \"\"\<left>"
+let g:template['c']['df'] = "#define  "
+let g:template['c']['ic'] = "#include  \"\"\<left>"
 let g:template['c']['ii'] = "#include  <>\<left>"
-let g:template['c']['f'] = "#ifndef  \<c-r>=GetFileName()\<cr>\<CR>#define  \<c-r>=GetFileName()\<cr>".
+let g:template['c']['ff'] = "#ifndef  \<c-r>=GetFileName()\<cr>\<CR>#define  \<c-r>=GetFileName()\<cr>".
             \repeat("\<cr>",5)."#endif  /*\<c-r>=GetFileName()\<cr>*/".repeat("\<up>",3)
 let g:template['c']['for'] = "for( ".s:rs."...".s:re." ; ".s:rs."...".s:re." ; ".s:rs."...".s:re." )\<cr>{\<cr>".
             \s:rs."...".s:re."\<cr>}\<cr>"
@@ -149,9 +171,11 @@ let g:template['c']['while'] = "while( ".s:rs."...".s:re." )\<cr>{\<cr>".s:rs.".
 let g:template['c']['ife'] = "if( ".s:rs."...".s:re." )\<cr>{\<cr>".s:rs."...".s:re."\<cr>} else\<cr>{\<cr>".s:rs."...".
             \s:re."\<cr>}"
 
+" ---------------------------------------------
 " C++ templates
 let g:template['cpp'] = g:template['c']
 
+" ---------------------------------------------
 " common templates
 let g:template['_'] = {}
 let g:template['_']['xt'] = "\<c-r>=strftime(\"%Y-%m-%d %H:%M:%S\")\<cr>"
