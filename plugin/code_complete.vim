@@ -2,8 +2,8 @@
 " File:         code_complete.vim
 " Brief:        function parameter complete, code snippets, and much more.
 " Author:       Mingbai <mbbill AT gmail DOT com>
-" Last Change:  2007-01-23 14:51:52
-" Version:      2.4
+" Last Change:  2007-01-25 11:41:13
+" Version:      2.5
 "
 " Install:      1. Put code_complete.vim to plugin 
 "                  directory.
@@ -35,7 +35,7 @@ let s:rs='`<'    "region start
 let s:re='>`'    "region stop
 
 " ----------------------------
-let s:expanded=0  "in case of insert char after expanded
+let s:expanded=0  "in case of inserting char after expand
 let s:signature_list=[]
 
 " Autocommands: {{{1
@@ -65,7 +65,7 @@ function! FunctionComplete()
     let signature_word=[]
     "let fun=substitute(getline('.')[:(col('.')-1)],'\zs.*\W\ze\w*$','','g') " get function name
     let fun=matchstr(getline('.')[:(col('.')-2)],'\w*$')
-    let ftags=taglist(fun)
+    let ftags=taglist("^".fun."$")
     if type(ftags)==type(0) || ((type(ftags)==type([])) && ftags==[])
         return '('
     endif
