@@ -2,8 +2,8 @@
 " File:         code_complete.vim
 " Brief:        function parameter complete, code snippets, and much more.
 " Author:       Mingbai <mbbill AT gmail DOT com>
-" Last Change:  2007-01-25 11:41:13
-" Version:      2.5
+" Last Change:  2007-03-06 21:58:25
+" Version:      2.6
 "
 " Install:      1. Put code_complete.vim to plugin 
 "                  directory.
@@ -13,33 +13,65 @@
 "
 " Usage:        
 "           hotkey:
-"               "("     complete funtion parameters.
-"               "<tab>" complete key words.
+"               "<tab>" (default value of g:completekey)
+"               Do all the jobs with this key, see
+"           example:
+"               press <tab> after function name and (
+"                 foo ( <tab>
+"               becomes:
+"                 foo ( `<first param>`,`<second param>` )
+"               press <tab> after code template
+"                 if <tab>
+"               becomes:
+"                 if( `<...>` )
+"                 {
+"                     `<...>`
+"                 }
+"
 "
 "           variables:
+"
 "               g:completekey
 "                   the key used to complete function 
 "                   parameters and key words.
-"               s:rs, s:re
+"
+"               g:rs, g:re
 "                   region start and stop
 "               you can change them as you like.
 "
+"               g:user_defined_snippets
+"                   file name of user defined snippets.
+"
 "           key words:
-"               see "templates" below.
+"               see "templates" section.
 "==================================================
 
 " Variable Definations: {{{1
-" options, change them as you like:
-let g:completekey="<tab>"   "hotkey
-let s:rs='`<'    "region start
-let s:re='>`'    "region stop
+" options, define them as you like in vimrc:
+if !exists("g:completekey")
+    let g:completekey = "<tab>"   "hotkey
+endif
+
+if !exists("g:rs")
+    let g:rs = '`<'    "region start
+endif
+
+if !exists("g:re")
+    let g:re = '>`'    "region stop
+endif
+
+if !exists("g:user_defined_snippets")
+    let g:user_defined_snippets = "$VIMRUNTIME/plugin/my_snippets.vim"
+endif
 
 " ----------------------------
-let s:expanded=0  "in case of inserting char after expand
-let s:signature_list=[]
+let s:expanded = 0  "in case of inserting char after expand
+let s:signature_list = []
+let s:jumppos = -1
+let s:doappend = 1
 
 " Autocommands: {{{1
-autocmd BufReadPost * call CodeCompleteStart()
+autocmd BufReadPost,BufNewFile * call CodeCompleteStart()
 
 " Menus:
 menu <silent>       &Tools.Code\ Complete\ Start          :call CodeCompleteStart()<CR>
@@ -49,31 +81,30 @@ menu <silent>       &Tools.Code\ Complete\ Stop           :call CodeCompleteStop
 
 function! CodeCompleteStart()
     set selection=inclusive
-    silent! iunmap  <buffer>    (
-    inoremap        <buffer>    (         <c-r>=FunctionComplete()<cr><c-r>=SwitchRegion('')<cr>
     exec "silent! iunmap  <buffer> ".g:completekey
-    exec "inoremap        <buffer> ".g:completekey." <c-r>=ExpandTemplate()<cr><c-r>=SwitchRegion(g:completekey)<cr>"
+    exec "inoremap <buffer> ".g:completekey." <c-r>=CodeComplete()<cr><c-r>=SwitchRegion()<cr>"
 endfunction
 
 function! CodeCompleteStop()
-    silent! iunmap      <buffer>    (
     exec "silent! iunmap <buffer> ".g:completekey
 endfunction
 
-function! FunctionComplete()
+function! FunctionComplete(fun)
     let s:signature_list=[]
     let signature_word=[]
-    "let fun=substitute(getline('.')[:(col('.')-1)],'\zs.*\W\ze\w*$','','g') " get function name
-    let fun=matchstr(getline('.')[:(col('.')-2)],'\w*$')
-    let ftags=taglist("^".fun."$")
+    let ftags=taglist("^".a:fun."$")
     if type(ftags)==type(0) || ((type(ftags)==type([])) && ftags==[])
-        return '('
+        return ''
     endif
     for i in ftags
         if has_key(i,'kind') && has_key(i,'name') && has_key(i,'signature')
-            if (i.kind=='p' || i.kind=='f') && i.name==fun  " p is declare, f is defination
-                let tmp=substitute(i.signature,',',s:re.','.s:rs,'g')
-                let tmp=substitute(tmp,'(\(.*\))','('.s:rs.'\1'.s:re.')','g')
+            if (i.kind=='p' || i.kind=='f') && i.name==a:fun  " p is declare, f is defination
+                if match(i.signature,'(\s*void\s*)')<0 && match(i.signature,'(\s*)')<0
+                    let tmp=substitute(i.signature,',',g:re.','.g:rs,'g')
+                    let tmp=substitute(tmp,'(\(.*\))',g:rs.'\1'.g:re.')','g')
+                else
+                    let tmp='()'
+                endif
                 if index(signature_word,tmp)==-1
                     let signature_word+=[tmp]
                     let item={}
@@ -85,7 +116,7 @@ function! FunctionComplete()
         endif
     endfor
     if s:signature_list==[]
-        return '('
+        return ''
     endif
     if len(s:signature_list)==1
         return s:signature_list[0]['word']
@@ -95,44 +126,65 @@ function! FunctionComplete()
     endif
 endfunction
 
-function! SwitchRegion(key)
+function! ExpandTemplate(cword)
+    "let cword = substitute(getline('.')[:(col('.')-2)],'\zs.*\W\ze\w*$','','g')
+    if has_key(g:template,&ft)
+        if has_key(g:template[&ft],a:cword)
+            let s:jumppos = line('.')
+            return "\<c-w>" . g:template[&ft][a:cword]
+        endif
+    endif
+    if has_key(g:template['_'],a:cword)
+        let s:jumppos = line('.')
+        return "\<c-w>" . g:template['_'][a:cword]
+    endif
+    return ''
+endfunction
+
+function! SwitchRegion()
     if len(s:signature_list)>1
         let s:signature_list=[]
         return ''
     endif
-    if match(getline('.'),s:rs.'.*'.s:re)!=-1 || search(s:rs.'.\{-}'.s:re)!=0
-        let s:expanded=0
+    if s:jumppos != -1
+        call cursor(s:jumppos,0)
+        let s:jumppos = -1
+    endif
+    if match(getline('.'),g:rs.'.*'.g:re)!=-1 || search(g:rs.'.\{-}'.g:re)!=0
         normal 0
-        call search(s:rs,'c',line('.'))
+        call search(g:rs,'c',line('.'))
         normal v
-        call search(s:re,'e',line('.'))
+        call search(g:re,'e',line('.'))
         return "\<c-\>\<c-n>gvo\<c-g>"
     else
-        if s:expanded==1
-            let s:expanded=0
-            return ''
-        elseif g:completekey=="<tab>"
-            exec 'return "'.escape(a:key,'<').'"'
-        else
-            return ''
+        if s:doappend == 1
+            if g:completekey == "<tab>"
+                return "\<tab>"
+            endif
         endif
+        return ''
     endif
 endfunction
 
-function! ExpandTemplate()
-    let cword = substitute(getline('.')[:(col('.')-2)],'\zs.*\W\ze\w*$','','g')
-    if has_key(g:template,&ft)
-        if has_key(g:template[&ft],cword)
-            let s:expanded=1  "in case of insert char after expanded
-            return "\<C-W>" . g:template[&ft][cword]
+function! CodeComplete()
+    let s:doappend = 1
+    let function_name = matchstr(getline('.')[:(col('.')-2)],'\zs\w*\ze\s*(\s*$')
+    if function_name != ''
+        let funcres = FunctionComplete(function_name)
+        if funcres != ''
+            let s:doappend = 0
         endif
+        return funcres
+    else
+        let template_name = substitute(getline('.')[:(col('.')-2)],'\zs.*\W\ze\w*$','','g')
+        let tempres = ExpandTemplate(template_name)
+        if tempres != ''
+            let s:doappend = 0
+        endif
+        return tempres
     endif
-    if has_key(g:template['_'],cword)
-        let s:expanded=1
-        return "\<C-W>" . g:template['_'][cword]
-    endif
-    return ""
 endfunction
+ 
 
 " [Get converted file name like __THIS_FILE__ ]
 function! GetFileName()
@@ -163,15 +215,15 @@ let g:template['c']['ic'] = "#include  \"\"\<left>"
 let g:template['c']['ii'] = "#include  <>\<left>"
 let g:template['c']['ff'] = "#ifndef  \<c-r>=GetFileName()\<cr>\<CR>#define  \<c-r>=GetFileName()\<cr>".
             \repeat("\<cr>",5)."#endif  /*\<c-r>=GetFileName()\<cr>*/".repeat("\<up>",3)
-let g:template['c']['for'] = "for( ".s:rs."...".s:re." ; ".s:rs."...".s:re." ; ".s:rs."...".s:re." )\<cr>{\<cr>".
-            \s:rs."...".s:re."\<cr>}\<cr>"
-let g:template['c']['main'] = "int main(int argc, char \*argv\[\])\<cr>{\<cr>".s:rs."...".s:re."\<cr>}"
-let g:template['c']['switch'] = "switch ( ".s:rs."...".s:re." )\<cr>{\<cr>case ".s:rs."...".s:re." :\<cr>break;\<cr>case ".
-            \s:rs."...".s:re." :\<cr>break;\<cr>default :\<cr>break;\<cr>}"
-let g:template['c']['if'] = "if( ".s:rs."...".s:re." )\<cr>{\<cr>".s:rs."...".s:re."\<cr>}"
-let g:template['c']['while'] = "while( ".s:rs."...".s:re." )\<cr>{\<cr>".s:rs."...".s:re."\<cr>}"
-let g:template['c']['ife'] = "if( ".s:rs."...".s:re." )\<cr>{\<cr>".s:rs."...".s:re."\<cr>} else\<cr>{\<cr>".s:rs."...".
-            \s:re."\<cr>}"
+let g:template['c']['for'] = "for( ".g:rs."...".g:re." ; ".g:rs."...".g:re." ; ".g:rs."...".g:re." )\<cr>{\<cr>".
+            \g:rs."...".g:re."\<cr>}\<cr>"
+let g:template['c']['main'] = "int main(int argc, char \*argv\[\])\<cr>{\<cr>".g:rs."...".g:re."\<cr>}"
+let g:template['c']['switch'] = "switch ( ".g:rs."...".g:re." )\<cr>{\<cr>case ".g:rs."...".g:re." :\<cr>break;\<cr>case ".
+            \g:rs."...".g:re." :\<cr>break;\<cr>default :\<cr>break;\<cr>}"
+let g:template['c']['if'] = "if( ".g:rs."...".g:re." )\<cr>{\<cr>".g:rs."...".g:re."\<cr>}"
+let g:template['c']['while'] = "while( ".g:rs."...".g:re." )\<cr>{\<cr>".g:rs."...".g:re."\<cr>}"
+let g:template['c']['ife'] = "if( ".g:rs."...".g:re." )\<cr>{\<cr>".g:rs."...".g:re."\<cr>} else\<cr>{\<cr>".g:rs."...".
+            \g:re."\<cr>}"
 
 " ---------------------------------------------
 " C++ templates
@@ -181,6 +233,10 @@ let g:template['cpp'] = g:template['c']
 " common templates
 let g:template['_'] = {}
 let g:template['_']['xt'] = "\<c-r>=strftime(\"%Y-%m-%d %H:%M:%S\")\<cr>"
+
+" ---------------------------------------------
+" load user defined snippets
+exec "silent! runtime ".g:user_defined_snippets
 
 
 " vim: set ft=vim ff=unix fdm=marker :
