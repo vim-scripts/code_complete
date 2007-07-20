@@ -2,16 +2,16 @@
 " File:         code_complete.vim
 " Brief:        function parameter complete, code snippets, and much more.
 " Author:       Mingbai <mbbill AT gmail DOT com>
-" Last Change:  2007-03-06 21:58:25
-" Version:      2.6
+" Last Change:  2007-07-20 17:39:10
+" Version:      2.7
 "
-" Install:      1. Put code_complete.vim to plugin 
+" Install:      1. Put code_complete.vim to plugin
 "                  directory.
-"               2. Use the command below to create tags 
+"               2. Use the command below to create tags
 "                  file including signature field.
 "                  ctags -R --c-kinds=+p --fields=+S .
 "
-" Usage:        
+" Usage:
 "           hotkey:
 "               "<tab>" (default value of g:completekey)
 "               Do all the jobs with this key, see
@@ -32,7 +32,7 @@
 "           variables:
 "
 "               g:completekey
-"                   the key used to complete function 
+"                   the key used to complete function
 "                   parameters and key words.
 "
 "               g:rs, g:re
@@ -45,6 +45,10 @@
 "           key words:
 "               see "templates" section.
 "==================================================
+
+if v:version < 700
+    finish
+endif
 
 " Variable Definations: {{{1
 " options, define them as you like in vimrc:
@@ -80,7 +84,6 @@ menu <silent>       &Tools.Code\ Complete\ Stop           :call CodeCompleteStop
 " Function Definations: {{{1
 
 function! CodeCompleteStart()
-    set selection=inclusive
     exec "silent! iunmap  <buffer> ".g:completekey
     exec "inoremap <buffer> ".g:completekey." <c-r>=CodeComplete()<cr><c-r>=SwitchRegion()<cr>"
 endfunction
@@ -103,9 +106,9 @@ function! FunctionComplete(fun)
                     let tmp=substitute(i.signature,',',g:re.','.g:rs,'g')
                     let tmp=substitute(tmp,'(\(.*\))',g:rs.'\1'.g:re.')','g')
                 else
-                    let tmp='()'
+                    let tmp=''
                 endif
-                if index(signature_word,tmp)==-1
+                if (tmp != '') && (index(signature_word,tmp) == -1)
                     let signature_word+=[tmp]
                     let item={}
                     let item['word']=tmp
@@ -116,7 +119,7 @@ function! FunctionComplete(fun)
         endif
     endfor
     if s:signature_list==[]
-        return ''
+        return ')'
     endif
     if len(s:signature_list)==1
         return s:signature_list[0]['word']
@@ -155,6 +158,9 @@ function! SwitchRegion()
         call search(g:rs,'c',line('.'))
         normal v
         call search(g:re,'e',line('.'))
+        if &selection == "exclusive"
+            exec "norm " . "\<right>"
+        endif
         return "\<c-\>\<c-n>gvo\<c-g>"
     else
         if s:doappend == 1
@@ -184,7 +190,7 @@ function! CodeComplete()
         return tempres
     endif
 endfunction
- 
+
 
 " [Get converted file name like __THIS_FILE__ ]
 function! GetFileName()
