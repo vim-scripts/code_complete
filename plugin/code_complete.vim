@@ -2,8 +2,8 @@
 " File:         code_complete.vim
 " Brief:        function parameter complete, code snippets, and much more.
 " Author:       Mingbai <mbbill AT gmail DOT com>
-" Last Change:  2007-07-20 17:39:10
-" Version:      2.7
+" Last Change:  2009-04-04 22:45:36
+" Version:      2.8
 "
 " Install:      1. Put code_complete.vim to plugin
 "                  directory.
@@ -50,7 +50,7 @@ if v:version < 700
     finish
 endif
 
-" Variable Definations: {{{1
+" Variable Definitions: {{{1
 " options, define them as you like in vimrc:
 if !exists("g:completekey")
     let g:completekey = "<tab>"   "hotkey
@@ -81,7 +81,7 @@ autocmd BufReadPost,BufNewFile * call CodeCompleteStart()
 menu <silent>       &Tools.Code\ Complete\ Start          :call CodeCompleteStart()<CR>
 menu <silent>       &Tools.Code\ Complete\ Stop           :call CodeCompleteStop()<CR>
 
-" Function Definations: {{{1
+" Function Definitions: {{{1
 
 function! CodeCompleteStart()
     exec "silent! iunmap  <buffer> ".g:completekey
@@ -100,8 +100,29 @@ function! FunctionComplete(fun)
         return ''
     endif
     for i in ftags
+		if match(i.cmd,'^/\^.*\(\*'.a:fun.'\)\(.*\)\;\$/')>=0
+			if match(i.cmd,'(\s*void\s*)')<0 && match(i.cmd,'(\s*)')<0
+					let tmp=substitute(i.cmd,'^/\^','','')
+					let tmp=substitute(tmp,'.*\(\*'.a:fun.'\)','','')
+					let tmp=substitute(tmp,'^[\){1}]','','')
+					let tmp=substitute(tmp,';\$\/;{1}','','')
+					let tmp=substitute(tmp,'\$\/','','')
+					let tmp=substitute(tmp,';','','')
+					let tmp=substitute(tmp,',',g:re.','.g:rs,'g')
+					let tmp=substitute(tmp,'(\(.*\))',g:rs.'\1'.g:re.')','g')
+            else
+                    let tmp=''
+            endif
+		endif
+		if (tmp != '') && (index(signature_word,tmp) == -1)
+			let signature_word+=[tmp]
+			let item={}
+			let item['word']=tmp
+			let item['menu']=i.filename
+			let s:signature_list+=[item]
+		endif
         if has_key(i,'kind') && has_key(i,'name') && has_key(i,'signature')
-            if (i.kind=='p' || i.kind=='f') && i.name==a:fun  " p is declare, f is defination
+            if (i.kind=='p' || i.kind=='f') && i.name==a:fun  " p is declare, f is definition
                 if match(i.signature,'(\s*void\s*)')<0 && match(i.signature,'(\s*)')<0
                     let tmp=substitute(i.signature,',',g:re.','.g:rs,'g')
                     let tmp=substitute(tmp,'(\(.*\))',g:rs.'\1'.g:re.')','g')
@@ -159,7 +180,7 @@ function! SwitchRegion()
         normal v
         call search(g:re,'e',line('.'))
         if &selection == "exclusive"
-            exec "norm " . "\<right>"
+            exec "norm l"
         endif
         return "\<c-\>\<c-n>gvo\<c-g>"
     else
@@ -197,7 +218,7 @@ function! GetFileName()
     let filename=expand("%:t")
     let filename=toupper(filename)
     let _name=substitute(filename,'\.','_',"g")
-    let _name="__"._name."__"
+    "let _name="__"._name."__"
     return _name
 endfunction
 
@@ -214,11 +235,11 @@ endfunction
 " C templates
 let g:template = {}
 let g:template['c'] = {}
-let g:template['c']['co'] = "/*  */\<left>\<left>\<left>"
-let g:template['c']['cc'] = "/**<  */\<left>\<left>\<left>"
-let g:template['c']['df'] = "#define  "
-let g:template['c']['ic'] = "#include  \"\"\<left>"
-let g:template['c']['ii'] = "#include  <>\<left>"
+let g:template['c']['cc'] = "/*  */\<left>\<left>\<left>"
+let g:template['c']['cd'] = "/**<  */\<left>\<left>\<left>"
+let g:template['c']['de'] = "#define     "
+let g:template['c']['in'] = "#include    \"\"\<left>"
+let g:template['c']['is'] = "#include  <>\<left>"
 let g:template['c']['ff'] = "#ifndef  \<c-r>=GetFileName()\<cr>\<CR>#define  \<c-r>=GetFileName()\<cr>".
             \repeat("\<cr>",5)."#endif  /*\<c-r>=GetFileName()\<cr>*/".repeat("\<up>",3)
 let g:template['c']['for'] = "for( ".g:rs."...".g:re." ; ".g:rs."...".g:re." ; ".g:rs."...".g:re." )\<cr>{\<cr>".
@@ -245,4 +266,4 @@ let g:template['_']['xt'] = "\<c-r>=strftime(\"%Y-%m-%d %H:%M:%S\")\<cr>"
 exec "silent! runtime ".g:user_defined_snippets
 
 
-" vim: set ft=vim ff=unix fdm=marker :
+" vim: set fdm=marker :
