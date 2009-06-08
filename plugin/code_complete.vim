@@ -2,8 +2,8 @@
 " File:         code_complete.vim
 " Brief:        function parameter complete, code snippets, and much more.
 " Author:       Mingbai <mbbill AT gmail DOT com>
-" Last Change:  2009-04-04 22:45:36
-" Version:      2.8
+" Last Change:  2009-06-09 00:09:03
+" Version:      2.9
 "
 " Install:      1. Put code_complete.vim to plugin
 "                  directory.
@@ -99,28 +99,29 @@ function! FunctionComplete(fun)
     if type(ftags)==type(0) || ((type(ftags)==type([])) && ftags==[])
         return ''
     endif
+    let tmp=''
     for i in ftags
-		if match(i.cmd,'^/\^.*\(\*'.a:fun.'\)\(.*\)\;\$/')>=0
-			if match(i.cmd,'(\s*void\s*)')<0 && match(i.cmd,'(\s*)')<0
-					let tmp=substitute(i.cmd,'^/\^','','')
-					let tmp=substitute(tmp,'.*\(\*'.a:fun.'\)','','')
-					let tmp=substitute(tmp,'^[\){1}]','','')
-					let tmp=substitute(tmp,';\$\/;{1}','','')
-					let tmp=substitute(tmp,'\$\/','','')
-					let tmp=substitute(tmp,';','','')
-					let tmp=substitute(tmp,',',g:re.','.g:rs,'g')
-					let tmp=substitute(tmp,'(\(.*\))',g:rs.'\1'.g:re.')','g')
+        if match(i.cmd,'^/\^.*\(\*'.a:fun.'\)\(.*\)\;\$/')>=0
+            if match(i.cmd,'(\s*void\s*)')<0 && match(i.cmd,'(\s*)')<0
+                    let tmp=substitute(i.cmd,'^/\^','','')
+                    let tmp=substitute(tmp,'.*\(\*'.a:fun.'\)','','')
+                    let tmp=substitute(tmp,'^[\){1}]','','')
+                    let tmp=substitute(tmp,';\$\/;{1}','','')
+                    let tmp=substitute(tmp,'\$\/','','')
+                    let tmp=substitute(tmp,';','','')
+                    let tmp=substitute(tmp,',',g:re.','.g:rs,'g')
+                    let tmp=substitute(tmp,'(\(.*\))',g:rs.'\1'.g:re.')','g')
             else
                     let tmp=''
             endif
-		endif
-		if (tmp != '') && (index(signature_word,tmp) == -1)
-			let signature_word+=[tmp]
-			let item={}
-			let item['word']=tmp
-			let item['menu']=i.filename
-			let s:signature_list+=[item]
-		endif
+            if (tmp != '') && (index(signature_word,tmp) == -1)
+                let signature_word+=[tmp]
+                let item={}
+                let item['word']=tmp
+                let item['menu']=i.filename
+                let s:signature_list+=[item]
+            endif
+        endif
         if has_key(i,'kind') && has_key(i,'name') && has_key(i,'signature')
             if (i.kind=='p' || i.kind=='f') && i.name==a:fun  " p is declare, f is definition
                 if match(i.signature,'(\s*void\s*)')<0 && match(i.signature,'(\s*)')<0
@@ -266,4 +267,4 @@ let g:template['_']['xt'] = "\<c-r>=strftime(\"%Y-%m-%d %H:%M:%S\")\<cr>"
 exec "silent! runtime ".g:user_defined_snippets
 
 
-" vim: set fdm=marker :
+" vim: set fdm=marker et :
